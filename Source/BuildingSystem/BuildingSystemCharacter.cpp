@@ -10,6 +10,10 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Input/InputConfig.h"
+#include "Input/ThaiEnhancedInputComponent.h"
+#include "ThaiNativeGameplayTags.h"
+#include "ThaiPlayerState.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -54,6 +58,28 @@ ABuildingSystemCharacter::ABuildingSystemCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
+void ABuildingSystemCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	if (auto PS = GetPlayerState<AThaiPlayerState>())
+	{
+		AbilitySystemComponent = Cast<UThaiAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+		// AI won't have PlayerControllers so we can init again here just to be sure. No harm in initing twice for heroes that have PlayerControllers.
+		AbilitySystemComponent->InitAbilityActorInfo(PS, this);
+	}
+}
+
+void ABuildingSystemCharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	if (auto PS = GetPlayerState<AThaiPlayerState>())
+	{
+		AbilitySystemComponent = Cast<UThaiAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+		// AI won't have PlayerControllers so we can init again here just to be sure. No harm in initing twice for heroes that have PlayerControllers.
+		AbilitySystemComponent->InitAbilityActorInfo(PS, this);
+	}
+}
+
 void ABuildingSystemCharacter::BeginPlay()
 {
 	// Call the base class  
@@ -69,23 +95,28 @@ void ABuildingSystemCharacter::BeginPlay()
 	}
 }
 
+UAbilitySystemComponent* ABuildingSystemCharacter::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Input
 
 void ABuildingSystemCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
+	if (UThaiEnhancedInputComponent* EnhancedInputComponent = Cast<UThaiEnhancedInputComponent>(PlayerInputComponent)) {
 		
 		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		EnhancedInputComponent->BindActionByTag(InputConfig, ThaiGameplayTags::Input_Jump, ETriggerEvent::Started, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindActionByTag(InputConfig, ThaiGameplayTags::Input_Jump, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ABuildingSystemCharacter::Move);
+		EnhancedInputComponent->BindActionByTag(InputConfig, ThaiGameplayTags::Input_Move, ETriggerEvent::Triggered, this, &ABuildingSystemCharacter::Move);
 
 		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ABuildingSystemCharacter::Look);
+		EnhancedInputComponent->BindActionByTag(InputConfig, ThaiGameplayTags::Input_Look_Mouse, ETriggerEvent::Triggered, this, &ABuildingSystemCharacter::Look);
 	}
 	else
 	{
